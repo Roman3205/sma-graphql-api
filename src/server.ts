@@ -107,12 +107,14 @@ const startServer = async () => {
 
         await server.start();
 
+        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+
         const corsOptions: cors.CorsOptions = {
             origin: (origin, callback) => {
-                if (!origin) {
+                if (!origin || allowedOrigins.includes(origin)) {
                     callback(null, true);
                 } else {
-                    callback(null, origin);
+                    callback(new Error("Not allowed by CORS"));
                 }
             },
             methods: ["GET", "POST", "OPTIONS"],
