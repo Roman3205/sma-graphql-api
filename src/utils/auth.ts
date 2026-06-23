@@ -1,18 +1,38 @@
-import { User } from "../generated/prisma/client";
-import { prisma } from "../lib/prisma";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
-const getUser = async (token: string): Promise<User | null> => {
-    if (!token) return null
+const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
+const SALT_ROUNDS = 10;
 
-    // the id decoded from token. login simplified by the fact that id equals 1
-    const userId = 1
-    const user = await prisma.user.findUnique({
-        where: {id: userId}
-    })
-
-    if (!user) return null
-
-    return user
+export interface JwtPayload {
+    userId: number;
 }
 
-export default getUser
+export function generateToken(userId: number): string {
+    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+export function hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+export function comparePasswords(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+}
+
+export function getUserIdFromToken(authHeader: string): number | null {
+    if (!authHeader) return null;
+
+    const token = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : authHeader;
+
+    if (!token) return null;
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+        return decoded.userId;
+    } catch {
+        return null;
+    }
+}

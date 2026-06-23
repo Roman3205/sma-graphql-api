@@ -1,11 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
   moduleFormat = "cjs"
 }
 
@@ -14,17 +9,56 @@ datasource db {
 }
 
 model Post {
-  id Int @id @default(autoincrement())
-  title String
-  content String?
-  published Boolean @default(false)
-  author User? @relation(fields: [authorId], references: [id])
-  authorId Int?
+  id         Int        @id @default(autoincrement())
+  title      String
+  content    String?
+  published  Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  author     User?      @relation(fields: [authorId], references: [id])
+  authorId   Int?
+  comments   Comment[]
+  categories Category[] @relation("PostCategories")
 }
 
 model User {
-  id Int @id @default(autoincrement())
-  email String @unique
-  name String
-  posts Post[]
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  name      String
+  password  String    @default("")
+  createdAt DateTime  @default(now())
+  posts     Post[]
+  comments  Comment[]
+  articles  Article[]
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  body      String
+  createdAt DateTime @default(now())
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+}
+
+model Article {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String?
+  createdAt DateTime @default(now())
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+  tags      Tag[]    @relation("ArticleTags")
+}
+
+model Tag {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  articles Article[] @relation("ArticleTags")
+}
+
+model Category {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  posts Post[] @relation("PostCategories")
 }
