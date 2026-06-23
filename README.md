@@ -32,7 +32,8 @@ npx prisma generate
 # Development (with hot reload)
 npm run dev
 
-# Production
+# Production Build & Start
+npm run build
 npm start
 ```
 
