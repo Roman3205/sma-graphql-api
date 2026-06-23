@@ -55,21 +55,24 @@ const resolvers = {
             const isBackward = !!args.last
 
             let cursorObj: { id: number } | undefined
-            let orderBy: any = { id: "asc" }
+            let orderBy: any = [{ createdAt: "desc" }, { id: "desc" }]
 
             if (args.after) {
                 cursorObj = { id: decodeCursor(args.after) }
-                orderBy = { id: "asc" }
+                orderBy = [{ createdAt: "desc" }, { id: "desc" }]
             } else if (args.before) {
                 cursorObj = { id: decodeCursor(args.before) }
-                orderBy = { id: "desc" }
+                orderBy = [{ createdAt: "asc" }, { id: "asc" }]
             }
 
             if (isBackward) {
-                orderBy = { id: "desc" }
+                orderBy = [{ createdAt: "asc" }, { id: "asc" }]
             }
 
             const posts = await prisma.post.findMany({
+                where: {
+                    published: true
+                },
                 take: take + 1,
                 ...(cursorObj && {
                     cursor: cursorObj,
@@ -90,7 +93,11 @@ const resolvers = {
                 node: post,
             }))
 
-            const totalCount = await prisma.post.count()
+            const totalCount = await prisma.post.count({
+                where: {
+                    published: true
+                },
+            })
 
             return {
                 edges,
@@ -290,7 +297,7 @@ const resolvers = {
     },
 
     Mutation: {
-        signup: async (_: unknown, args: SignupInput) => {
+        signup: async (_: unknown, args: SignupInput, context: requestContext) => {
             const { email, name, password } = args.data
 
             if (password.length < 6) {
@@ -312,10 +319,20 @@ const resolvers = {
                 data: { email, name, password: hashedPassword },
             })
 
-            return { token: generateToken(user.id), user }
+            const token = generateToken(user.id)
+            if (context.res) {
+                context.res.cookie("apollo-token", token, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "lax",
+                    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+                })
+            }
+
+            return { token, user }
         },
 
-        login: async (_: unknown, args: LoginInput) => {
+        login: async (_: unknown, args: LoginInput, context: requestContext) => {
             const { email, password } = args.data
 
             const user = await prisma.user.findUnique({ where: { email } })
@@ -332,7 +349,17 @@ const resolvers = {
                 })
             }
 
-            return { token: generateToken(user.id), user }
+            const token = generateToken(user.id)
+            if (context.res) {
+                context.res.cookie("apollo-token", token, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "lax",
+                    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+                })
+            }
+
+            return { token, user }
         },
 
         createDraft: async (_: unknown, args: PostCreateInput, context: requestContext) => {
@@ -346,7 +373,6 @@ const resolvers = {
                 },
             })
 
-            pubsub.publish(POST_CREATED, { postCreated: post })
             return post
         },
 
@@ -360,10 +386,14 @@ const resolvers = {
                 })
             }
 
-            return prisma.post.update({
+            const updatedPost = prisma.post.update({
                 where: { id: post.id },
                 data: { published: true },
             })
+
+            pubsub.publish(POST_CREATED, { postCreated: updatedPost })
+
+            return post
         },
 
         deletePost: async (_: unknown, args: { id: string }, context: requestContext) => {
@@ -433,6 +463,17 @@ const resolvers = {
                 where: { id: post.id },
                 data: { categories: { connect: { id: Number(args.categoryId) } } },
             })
+        },
+
+        logout: (_: unknown, __: unknown, context: requestContext) => {
+            if (context.res) {
+                context.res.clearCookie("apollo-token", {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "lax",
+                })
+            }
+            return true
         },
     },
 

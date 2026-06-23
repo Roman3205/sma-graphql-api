@@ -34,7 +34,7 @@
         id: ID!
         body: String!
         createdAt: String!
-        author: User!
+        author: User
         post: Post!
     }
 
@@ -43,7 +43,7 @@
         title: String!
         content: String
         createdAt: String!
-        author: User!
+        author: User
         tags: [Tag!]!
     }
 
@@ -193,6 +193,11 @@
         Associate a category with a post.
         """
         addCategoryToPost(postId: ID!, categoryId: ID!): Post!
+
+        """
+        Log out the currently authenticated user by clearing the token cookie.
+        """
+        logout: Boolean!
     }
 
     type Subscription {

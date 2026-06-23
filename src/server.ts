@@ -16,12 +16,14 @@ import { createLoaders, Loaders } from "./lib/dataloader";
 import responseCachePlugin from "@apollo/server-plugin-response-cache";
 import { depthLimit } from "@graphile/depth-limit";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 
 const typeDefs = readFileSync("./src/schema.graphql", { encoding: "utf-8" });
 
 export interface requestContext {
     userId: number | null;
     loaders: Loaders;
+    res?: express.Response;
 }
 
 const startServer = async () => {
@@ -29,6 +31,7 @@ const startServer = async () => {
         const PORT = process.env.PORT || 4000;
 
         const app = express();
+        app.use(cookieParser());
         const httpServer = http.createServer(app);
 
         const schema = makeExecutableSchema({ typeDefs, resolvers });
@@ -41,7 +44,11 @@ const startServer = async () => {
             {
                 schema,
                 context: async (ctx) => {
-                    const token = (ctx.connectionParams?.Authorization as string) || "";
+                    const req = ctx.extra.request as any;
+                    if (req && !req.cookies) {
+                        cookieParser()(req, {} as any, () => {});
+                    }
+                    const token = (ctx.connectionParams?.Authorization as string) || req?.cookies?.["apollo-token"] || "";
                     const userId = getUserIdFromToken(token);
                     return {
                         userId,
@@ -101,7 +108,13 @@ const startServer = async () => {
         await server.start();
 
         const corsOptions: cors.CorsOptions = {
-            origin: process.env.CORS_ORIGIN || "*",
+            origin: (origin, callback) => {
+                if (!origin) {
+                    callback(null, true);
+                } else {
+                    callback(null, origin);
+                }
+            },
             methods: ["GET", "POST", "OPTIONS"],
             allowedHeaders: [
                 "Content-Type",
@@ -132,12 +145,12 @@ const startServer = async () => {
             express.json(),
             graphqlLimiter,
             expressMiddleware(server, {
-                context: async ({ req }) => {
-                    const token = req.headers.authorization || "";
+                context: async ({ req, res }) => {
+                    const token = req.headers.authorization || req.cookies?.["apollo-token"] || "";
                     const userId = getUserIdFromToken(token);
                     const loaders = createLoaders();
 
-                    return { userId, loaders };
+                    return { userId, loaders, res };
                 },
             })
         );
