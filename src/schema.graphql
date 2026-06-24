@@ -110,7 +110,7 @@
         """
         Retrieve the currently authenticated user's profile.
         """
-        me: User!
+        me: User
 
         """
         Retrieve a comment by post ID and comment ID.

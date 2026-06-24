@@ -1,7 +1,7 @@
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  // importFileExtension = "js" resolves all .js in /generated enabling compile via npx tsc 
 }
 
 datasource db {
